@@ -363,9 +363,7 @@ create_project_structure() {
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "winston": "^3.11.0",
-    "express-rate-limit": "^7.1.5",
-    "joi": "^17.11.0"
+    "express-rate-limit": "^7.1.5"
   },
   "devDependencies": {
     "@types/node": "^20.10.4",
@@ -416,8 +414,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including dev dependencies for build)
+RUN npm install
 
 # Copy source code
 COPY src ./src
@@ -436,10 +434,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install only production dependencies
+RUN npm install --omit=dev && npm cache clean --force
 
-# Copy built application
+# Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
 # Create non-root user
@@ -464,39 +462,24 @@ EOF
 
         # Create main application file
         cat > "backend/$service_name/src/main.ts" << EOF
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { createLogger, format, transports } from 'winston';
 import rateLimit from 'express-rate-limit';
 
 // Load environment variables
 dotenv.config();
 
 // Create Express app
-const app: Application = express();
+const app = express();
 const port = process.env.PORT || $service_port;
 
-// Create logger
-const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: format.combine(
-    format.timestamp(),
-    format.errors({ stack: true }),
-    format.json()
-  ),
-  defaultMeta: { service: '$service_name' },
-  transports: [
-    new transports.Console({
-      format: format.combine(
-        format.colorize(),
-        format.simple()
-      )
-    })
-  ]
-});
+// Simple logger
+const log = (message: string) => {
+  console.log(\`[\${new Date().toISOString()}] [$service_name] \${message}\`);
+};
 
 // Rate limiting
 const limiter = rateLimit({
@@ -517,23 +500,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', limiter);
 
 // Request logging
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    logger.info({
-      method: req.method,
-      url: req.url,
-      status: res.statusCode,
-      duration: \`\${duration}ms\`,
-      ip: req.ip
-    });
+    log(\`\${req.method} \${req.url} - \${res.statusCode} (\${duration}ms)\`);
   });
   next();
 });
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: '$service_name',
@@ -545,7 +522,7 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Metrics endpoint
-app.get('/metrics', (req: Request, res: Response) => {
+app.get('/metrics', (req, res) => {
   const memoryUsage = process.memoryUsage();
   res.json({
     service: '$service_name',
@@ -561,7 +538,7 @@ app.get('/metrics', (req: Request, res: Response) => {
 });
 
 // API routes
-app.get('/api/v1/$service_name', (req: Request, res: Response) => {
+app.get('/api/v1/$service_name', (req, res) => {
   res.json({
     message: 'Welcome to $service_name',
     version: '1.0.0',
@@ -570,7 +547,7 @@ app.get('/api/v1/$service_name', (req: Request, res: Response) => {
 });
 
 // 404 handler
-app.use((req: Request, res: Response) => {
+app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
     message: 'The requested resource was not found',
@@ -579,14 +556,8 @@ app.use((req: Request, res: Response) => {
 });
 
 // Error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error({
-    error: err.message,
-    stack: err.stack,
-    url: req.url,
-    method: req.method
-  });
-
+app.use((err: any, req: any, res: any, next: any) => {
+  log(\`Error: \${err.message}\`);
   res.status(500).json({
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'production' 
@@ -597,20 +568,20 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 // Start server
 const server = app.listen(port, () => {
-  logger.info(\`$service_name listening on port \${port}\`);
-  logger.info(\`Environment: \${process.env.NODE_ENV || 'development'}\`);
+  log(\`$service_name listening on port \${port}\`);
+  log(\`Environment: \${process.env.NODE_ENV || 'development'}\`);
 });
 
 // Graceful shutdown
 const gracefulShutdown = () => {
-  logger.info('Received shutdown signal, closing server gracefully...');
+  log('Received shutdown signal, closing server gracefully...');
   server.close(() => {
-    logger.info('Server closed');
+    log('Server closed');
     process.exit(0);
   });
 
   setTimeout(() => {
-    logger.error('Could not close connections in time, forcefully shutting down');
+    log('Could not close connections in time, forcefully shutting down');
     process.exit(1);
   }, 30000);
 };
@@ -619,12 +590,12 @@ process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
 process.on('uncaughtException', (err) => {
-  logger.error('Uncaught Exception:', err);
+  log(\`Uncaught Exception: \${err.message}\`);
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on('unhandledRejection', (reason: any, promise) => {
+  log(\`Unhandled Rejection: \${reason}\`);
   process.exit(1);
 });
 
@@ -744,7 +715,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .

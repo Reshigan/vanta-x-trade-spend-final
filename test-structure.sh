@@ -48,9 +48,41 @@ for service_info in "${services[@]}"; do
     mkdir -p "backend/$service_name/src"
     
     # Create minimal files to test Docker build context
-    echo '{"name": "@vantax/'$service_name'", "version": "1.0.0"}' > "backend/$service_name/package.json"
+    cat > "backend/$service_name/package.json" << EOF
+{
+  "name": "@vantax/$service_name",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.4"
+  }
+}
+EOF
+    
     echo 'console.log("'$service_name' starting...");' > "backend/$service_name/src/main.ts"
-    echo 'FROM node:18-alpine' > "backend/$service_name/Dockerfile"
+    
+    cat > "backend/$service_name/Dockerfile" << EOF
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY src ./src
+RUN npm run build
+
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY --from=builder /app/dist ./dist
+CMD ["node", "dist/main.js"]
+EOF
     
     print_message "✓ Created $service_name" $GREEN
 done
