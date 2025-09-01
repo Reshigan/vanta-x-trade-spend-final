@@ -1,21 +1,56 @@
-# Vanta X - Trade Spend Management Platform
+# Vanta X - FMCG Trade Marketing Management Platform
 
 ![Vanta X Logo](./docs/images/vanta-x-logo.png)
 
-## 🚀 Enterprise Trade Marketing Platform
+## 🚀 Enterprise FMCG Trade Marketing Platform
 
-A comprehensive, AI-powered trade spend management platform designed for multi-company retail and distribution enterprises.
+A comprehensive AI-powered trade marketing management platform that optimizes marketing spend, cash co-op investments, and trading terms while providing predictive analytics and intelligent recommendations for multinational FMCG distributors and manufacturers.
 
 ### 🌟 Key Features
 
-- **🏢 Multi-Company Architecture**: Support for multiple companies with isolated data
-- **🔐 Microsoft 365 SSO**: Enterprise-grade authentication
-- **🔌 SAP Integration**: Seamless connection with SAP ECC and S/4HANA
-- **📊 Excel Import/Export**: User-friendly data management with templates
-- **🤖 AI/ML Analytics**: Advanced optimization and predictions
-- **💬 AI Assistant**: Natural language chatbot for insights
-- **📱 Responsive Design**: Mobile, tablet, and desktop support
-- **🎯 Real-time Analytics**: Live dashboards and monitoring
+#### Master Data Management
+- **📊 5-Level Customer Hierarchy**: Global Account → Region → Country → Channel → Store
+- **📦 5-Level Product Hierarchy**: Category → Subcategory → Brand → Product Line → SKU
+- **👥 Dynamic Customer Groups**: Rule-based segmentation with behavioral analytics
+- **🏭 Multi-Vendor Support**: Manage distributed and own brands
+
+#### AI-Powered Intelligence
+- **🤖 Ensemble Forecasting**: ARIMA, Prophet, XGBoost, and Neural Networks
+- **🎲 Monte Carlo Simulations**: Risk analysis and scenario planning
+- **💡 AI Assistant**: Natural language interface with contextual recommendations
+- **👁️ Computer Vision**: Campaign display analysis and compliance checking
+- **📈 Predictive Analytics**: ML-driven insights and anomaly detection
+
+#### Financial Management
+- **💰 Smart Budget Planning**: AI-suggested allocations with KAM adjustments
+- **💳 Digital Wallets**: QR-code based co-op fund management
+- **📍 Geo-fencing**: Location-based transaction validation
+- **📊 Real-time ROI**: Live profitability tracking and optimization
+
+#### Campaign & Promotion Management
+- **🎯 Multi-dimensional Campaigns**: Customer and product hierarchy overlays
+- **🏷️ Dynamic Promotions**: Flexible pricing with baseline analysis
+- **💹 Profitability Analysis**: Net profit calculations with cannibalization
+- **🎨 AI Caption Generation**: GPT-powered creative content
+
+#### Trading Terms & Compliance
+- **📋 Flexible Terms Engine**: Volume discounts, rebates, and allowances
+- **✅ Visual Workflow Designer**: Drag-and-drop approval processes
+- **🔒 GDPR Compliance**: Privacy by design with audit trails
+- **📑 SOX Compliance**: Financial controls and reporting
+
+#### Executive Analytics
+- **🗺️ Profitability Heat Maps**: Multi-dimensional performance views
+- **🎯 Opportunity Analysis**: AI-identified growth opportunities
+- **📊 Performance Scorecards**: Real-time KPI tracking
+- **📈 Trend Analysis**: Predictive insights with what-if scenarios
+
+#### Integration & Connectivity
+- **🔐 Microsoft 365 SSO**: Enterprise authentication
+- **🔌 SAP Integration**: Bidirectional sync with ECC and S/4HANA
+- **📊 Excel Import/Export**: Smart templates with validation
+- **📱 Mobile Apps**: Offline-capable field execution tools
+- **🌐 API-First Architecture**: RESTful and GraphQL endpoints
 
 ### 🏗️ Architecture
 

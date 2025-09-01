@@ -1,0 +1,1364 @@
+// Enhanced Prisma schema for FMCG Trade Marketing Management System
+// Includes 5-level hierarchies, digital wallets, and comprehensive features
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== IDENTITY & ACCESS ====================
+
+model User {
+  id                    String                  @id @default(uuid())
+  email                 String                  @unique
+  password              String?
+  firstName             String
+  lastName              String
+  azureId               String?                 @unique
+  googleId              String?                 @unique
+  role                  UserRole
+  department            String?
+  title                 String?
+  phone                 String?
+  isActive              Boolean                 @default(true)
+  lastLoginAt           DateTime?
+  passwordResetToken    String?
+  passwordResetExpires  DateTime?
+  twoFactorEnabled      Boolean                 @default(false)
+  twoFactorSecret       String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  // Relations
+  company               Company                 @relation(fields: [companyId], references: [id])
+  companyId             String
+  refreshTokens         RefreshToken[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  notificationPreference NotificationPreference?
+  chatSessions          ChatSession[]
+  digitalWallets        DigitalWallet[]
+  approvals             Approval[]
+  delegations           Delegation[]
+  userActivities        UserActivity[]
+  
+  @@index([email])
+  @@index([companyId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  ANALYST
+  USER
+  VIEWER
+  FIELD_REP
+  KAM
+  MARKETING_DIRECTOR
+  EXECUTIVE
+}
+
+// ==================== COMPANY & ORGANIZATION ====================
+
+model Company {
+  id                    String                  @id @default(uuid())
+  name                  String
+  code                  String                  @unique
+  domain                String?
+  email                 String
+  phone                 String?
+  address               String?
+  country               String?
+  currency              String                  @default("USD")
+  timezone              String                  @default("UTC")
+  fiscalYearStart       Int                     @default(1)
+  licenseType           LicenseType
+  licenseCount          Int
+  licenseExpiresAt      DateTime
+  settings              Json?
+  features              Json?                   // Feature toggles
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  // Relations
+  users                 User[]
+  vendors               Vendor[]
+  customerGlobalAccounts CustomerGlobalAccount[]
+  customerRegions       CustomerRegion[]
+  customerCountries     CustomerCountry[]
+  customerChannels      CustomerChannel[]
+  stores                Store[]
+  customerGroups        CustomerGroup[]
+  productCategories     ProductCategory[]
+  productSubcategories  ProductSubcategory[]
+  brands                Brand[]
+  productLines          ProductLine[]
+  products              Product[]
+  promotions            Promotion[]
+  campaigns             Campaign[]
+  budgets               Budget[]
+  tradingTerms          TradingTerm[]
+  tradeSpends           TradeSpend[]
+  coopBudgets           CoopBudget[]
+  digitalWallets        DigitalWallet[]
+  analytics             Analytics[]
+  aiInsights            AIInsight[]
+  forecasts             Forecast[]
+  simulations           Simulation[]
+  reports               Report[]
+  workflows             Workflow[]
+  integrations          Integration[]
+  
+  @@index([code])
+}
+
+enum LicenseType {
+  TRIAL
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// ==================== VENDOR/PRINCIPAL MANAGEMENT ====================
+
+model Vendor {
+  id                    String                  @id @default(uuid())
+  code                  String                  @unique
+  name                  String
+  type                  VendorType
+  contactPerson         String?
+  contactEmail          String?
+  contactPhone          String?
+  address               String?
+  commissionStructure   Json?
+  distributionAgreement Json?
+  performanceMetrics    Json?
+  companyId             String
+  company               Company                 @relation(fields: [companyId], references: [id])
+  isActive              Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  // Relations
+  brands                Brand[]
+  products              Product[]
+  budgets               Budget[]
+  campaigns             Campaign[]
+  coopBudgets           CoopBudget[]
+  
+  @@index([companyId])
+}
+
+enum VendorType {
+  PRINCIPAL
+  DISTRIBUTOR
+  MANUFACTURER
+  SUPPLIER
+}
+
+// ==================== CUSTOMER HIERARCHY (5 LEVELS) ====================
+
+model CustomerGlobalAccount {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  name        String
+  description String?
+  attributes  Json?
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  regions     CustomerRegion[]
+  
+  @@index([companyId])
+}
+
+model CustomerRegion {
+  id                String                @id @default(uuid())
+  code              String                @unique
+  name              String
+  description       String?
+  globalAccountId   String
+  globalAccount     CustomerGlobalAccount @relation(fields: [globalAccountId], references: [id])
+  companyId         String
+  company           Company               @relation(fields: [companyId], references: [id])
+  isActive          Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  
+  countries         CustomerCountry[]
+  
+  @@index([globalAccountId])
+  @@index([companyId])
+}
+
+model CustomerCountry {
+  id          String          @id @default(uuid())
+  code        String          @unique
+  name        String
+  isoCode     String?
+  regionId    String
+  region      CustomerRegion  @relation(fields: [regionId], references: [id])
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id])
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  channels    CustomerChannel[]
+  
+  @@index([regionId])
+  @@index([companyId])
+}
+
+model CustomerChannel {
+  id          String          @id @default(uuid())
+  code        String          @unique
+  name        String
+  type        ChannelType
+  description String?
+  countryId   String
+  country     CustomerCountry @relation(fields: [countryId], references: [id])
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id])
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  stores      Store[]
+  
+  @@index([countryId])
+  @@index([companyId])
+}
+
+enum ChannelType {
+  RETAIL
+  WHOLESALE
+  ONLINE
+  B2B
+  FOODSERVICE
+  CONVENIENCE
+  PHARMACY
+}
+
+model Store {
+  id            String          @id @default(uuid())
+  code          String          @unique
+  name          String
+  type          StoreType
+  format        String?         // Store format (hypermarket, supermarket, etc.)
+  size          String?         // Store size classification
+  address       String?
+  city          String?
+  state         String?
+  postalCode    String?
+  latitude      Float?
+  longitude     Float?
+  geoFence      Json?           // Geofencing boundaries
+  contactPerson String?
+  contactEmail  String?
+  contactPhone  String?
+  channelId     String
+  channel       CustomerChannel @relation(fields: [channelId], references: [id])
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id])
+  attributes    Json?           // Custom attributes
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  // Relations
+  customerGroupStores CustomerGroupStore[]
+  promotionStores     PromotionStore[]
+  campaignStores      CampaignStore[]
+  tradingTerms        TradingTerm[]
+  tradeSpends         TradeSpend[]
+  digitalWallets      DigitalWallet[]
+  walletTransactions  WalletTransaction[]
+  analytics           Analytics[]
+  
+  @@index([channelId])
+  @@index([companyId])
+  @@index([latitude, longitude])
+}
+
+enum StoreType {
+  HYPERMARKET
+  SUPERMARKET
+  CONVENIENCE
+  PHARMACY
+  WHOLESALE
+  ONLINE
+  DEPARTMENT_STORE
+  SPECIALTY
+}
+
+// Customer Groups
+model CustomerGroup {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  type        String    // STATIC, DYNAMIC
+  rules       Json?     // Dynamic grouping rules
+  attributes  Json?     // Custom attributes
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  stores      CustomerGroupStore[]
+  
+  @@index([companyId])
+}
+
+model CustomerGroupStore {
+  id              String        @id @default(uuid())
+  customerGroupId String
+  customerGroup   CustomerGroup @relation(fields: [customerGroupId], references: [id])
+  storeId         String
+  store           Store         @relation(fields: [storeId], references: [id])
+  createdAt       DateTime      @default(now())
+  
+  @@unique([customerGroupId, storeId])
+  @@index([customerGroupId])
+  @@index([storeId])
+}
+
+// ==================== PRODUCT HIERARCHY (5 LEVELS) ====================
+
+model ProductCategory {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  name        String
+  description String?
+  attributes  Json?
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  subcategories ProductSubcategory[]
+  
+  @@index([companyId])
+}
+
+model ProductSubcategory {
+  id          String          @id @default(uuid())
+  code        String          @unique
+  name        String
+  description String?
+  categoryId  String
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id])
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  brands      Brand[]
+  
+  @@index([categoryId])
+  @@index([companyId])
+}
+
+model Brand {
+  id              String             @id @default(uuid())
+  code            String             @unique
+  name            String
+  description     String?
+  logo            String?
+  subcategoryId   String
+  subcategory     ProductSubcategory @relation(fields: [subcategoryId], references: [id])
+  vendorId        String?
+  vendor          Vendor?            @relation(fields: [vendorId], references: [id])
+  companyId       String
+  company         Company            @relation(fields: [companyId], references: [id])
+  isOwnBrand      Boolean            @default(false)
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  
+  productLines    ProductLine[]
+  
+  @@index([subcategoryId])
+  @@index([vendorId])
+  @@index([companyId])
+}
+
+model ProductLine {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  name        String
+  description String?
+  brandId     String
+  brand       Brand     @relation(fields: [brandId], references: [id])
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  products    Product[]
+  
+  @@index([brandId])
+  @@index([companyId])
+}
+
+model Product {
+  id              String       @id @default(uuid())
+  sku             String       @unique
+  name            String
+  description     String?
+  barcode         String?
+  unitPrice       Float
+  cost            Float?
+  weight          Float?
+  volume          Float?
+  packSize        String?
+  productLineId   String
+  productLine     ProductLine  @relation(fields: [productLineId], references: [id])
+  vendorId        String?
+  vendor          Vendor?      @relation(fields: [vendorId], references: [id])
+  companyId       String
+  company         Company      @relation(fields: [companyId], references: [id])
+  attributes      Json?        // Custom attributes
+  lifecycle       String?      // NEW, ACTIVE, PHASE_OUT, DISCONTINUED
+  launchDate      DateTime?
+  discontinueDate DateTime?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  // Relations
+  promotionProducts   PromotionProduct[]
+  campaignProducts    CampaignProduct[]
+  tradingTermProducts TradingTermProduct[]
+  forecasts           Forecast[]
+  
+  @@index([productLineId])
+  @@index([vendorId])
+  @@index([companyId])
+  @@index([sku])
+  @@index([barcode])
+}
+
+// ==================== BUDGET & FORECASTING ====================
+
+model Budget {
+  id              String    @id @default(uuid())
+  name            String
+  type            BudgetType
+  year            Int
+  period          String    // ANNUAL, QUARTERLY, MONTHLY
+  amount          Float
+  allocatedAmount Float     @default(0)
+  spentAmount     Float     @default(0)
+  vendorId        String?
+  vendor          Vendor?   @relation(fields: [vendorId], references: [id])
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  status          BudgetStatus
+  approvedBy      String?
+  approvedAt      DateTime?
+  lockedBy        String?
+  lockedAt        DateTime?
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  campaigns       Campaign[]
+  coopBudgets     CoopBudget[]
+  budgetAllocations BudgetAllocation[]
+  
+  @@index([companyId])
+  @@index([vendorId])
+  @@index([year])
+}
+
+enum BudgetType {
+  MARKETING
+  TRADE_SPEND
+  COOP
+  PROMOTIONAL
+  ADVERTISING
+}
+
+enum BudgetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  LOCKED
+  CLOSED
+}
+
+model BudgetAllocation {
+  id          String    @id @default(uuid())
+  budgetId    String
+  budget      Budget    @relation(fields: [budgetId], references: [id])
+  level       String    // REGION, COUNTRY, CHANNEL, STORE
+  entityId    String    // ID of the entity (region, country, etc.)
+  amount      Float
+  spentAmount Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([budgetId])
+  @@index([entityId])
+}
+
+model Forecast {
+  id              String    @id @default(uuid())
+  type            ForecastType
+  productId       String?
+  product         Product?  @relation(fields: [productId], references: [id])
+  storeId         String?
+  period          DateTime
+  historicalData  Json      // Historical data used
+  mlModel         String    // Model used (ARIMA, Prophet, XGBoost, etc.)
+  modelParams     Json      // Model parameters
+  predictedValue  Float
+  confidenceLower Float
+  confidenceUpper Float
+  actualValue     Float?
+  accuracy        Float?
+  adjustedValue   Float?    // KAM adjusted value
+  adjustedBy      String?
+  adjustedAt      DateTime?
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([companyId])
+  @@index([productId])
+  @@index([storeId])
+  @@index([period])
+}
+
+enum ForecastType {
+  SALES_VOLUME
+  REVENUE
+  TRADE_SPEND
+  ROI
+  MARKET_SHARE
+}
+
+// ==================== CAMPAIGNS & PROMOTIONS ====================
+
+model Campaign {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  name            String
+  description     String?
+  type            CampaignType
+  objective       String?
+  startDate       DateTime
+  endDate         DateTime
+  budgetId        String?
+  budget          Budget?   @relation(fields: [budgetId], references: [id])
+  plannedSpend    Float
+  actualSpend     Float     @default(0)
+  vendorId        String?
+  vendor          Vendor?   @relation(fields: [vendorId], references: [id])
+  status          CampaignStatus
+  aiCaption       String?   // AI generated caption
+  creativeAssets  Json?     // Links to creative assets
+  performance     Json?     // Performance metrics
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  createdBy       String
+  updatedBy       String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  campaignStores    CampaignStore[]
+  campaignProducts  CampaignProduct[]
+  promotions        Promotion[]
+  
+  @@index([companyId])
+  @@index([vendorId])
+  @@index([startDate, endDate])
+}
+
+enum CampaignType {
+  BRAND_AWARENESS
+  PRODUCT_LAUNCH
+  SEASONAL
+  PROMOTIONAL
+  LOYALTY
+  DIGITAL
+  INTEGRATED
+}
+
+enum CampaignStatus {
+  DRAFT
+  PLANNED
+  APPROVED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model CampaignStore {
+  id          String    @id @default(uuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id])
+  allocation  Float?    // Budget allocation for this store
+  createdAt   DateTime  @default(now())
+  
+  @@unique([campaignId, storeId])
+  @@index([campaignId])
+  @@index([storeId])
+}
+
+model CampaignProduct {
+  id          String    @id @default(uuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  allocation  Float?    // Budget allocation for this product
+  createdAt   DateTime  @default(now())
+  
+  @@unique([campaignId, productId])
+  @@index([campaignId])
+  @@index([productId])
+}
+
+model Promotion {
+  id                String    @id @default(uuid())
+  code              String    @unique
+  name              String
+  description       String?
+  type              PromotionType
+  mechanism         String?   // PRICE_OFF, BOGO, BUNDLE, etc.
+  campaignId        String?
+  campaign          Campaign? @relation(fields: [campaignId], references: [id])
+  startDate         DateTime
+  endDate           DateTime
+  baselineStart     DateTime? // 6 weeks before
+  baselineEnd       DateTime? // 6 weeks after
+  discountType      DiscountType
+  discountValue     Float
+  minPurchase       Float?
+  maxDiscount       Float?
+  reasonCode        String?
+  budget            Float
+  actualSpend       Float     @default(0)
+  targetRevenue     Float?
+  actualRevenue     Float?
+  targetVolume      Float?
+  actualVolume      Float?
+  roi               Float?
+  profitability     Float?
+  cannibalization   Float?
+  incrementalSales  Float?
+  status            PromotionStatus
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  createdBy         String
+  createdByUser     User      @relation("CreatedBy", fields: [createdBy], references: [id])
+  updatedBy         String?
+  updatedByUser     User?     @relation("UpdatedBy", fields: [updatedBy], references: [id])
+  approvedBy        String?
+  approvedAt        DateTime?
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  promotionStores   PromotionStore[]
+  promotionProducts PromotionProduct[]
+  tradeSpends       TradeSpend[]
+  
+  @@index([companyId])
+  @@index([campaignId])
+  @@index([startDate, endDate])
+  @@index([status])
+}
+
+enum PromotionType {
+  PRICE_REDUCTION
+  BOGO
+  BUNDLE
+  LOYALTY
+  SEASONAL
+  CLEARANCE
+  NEW_PRODUCT
+  CROSS_SELL
+  VOLUME_DISCOUNT
+  GIFT_WITH_PURCHASE
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  TIERED
+  DYNAMIC
+}
+
+enum PromotionStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model PromotionStore {
+  id          String    @id @default(uuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id])
+  allocation  Float?    // Budget allocation
+  performance Json?     // Store-specific performance
+  createdAt   DateTime  @default(now())
+  
+  @@unique([promotionId, storeId])
+  @@index([promotionId])
+  @@index([storeId])
+}
+
+model PromotionProduct {
+  id              String    @id @default(uuid())
+  promotionId     String
+  promotion       Promotion @relation(fields: [promotionId], references: [id])
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id])
+  discountValue   Float?    // Product-specific discount
+  targetVolume    Float?
+  actualVolume    Float?
+  createdAt       DateTime  @default(now())
+  
+  @@unique([promotionId, productId])
+  @@index([promotionId])
+  @@index([productId])
+}
+
+// ==================== TRADING TERMS ====================
+
+model TradingTerm {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  name            String
+  type            TradingTermType
+  storeId         String?
+  store           Store?    @relation(fields: [storeId], references: [id])
+  startDate       DateTime
+  endDate         DateTime?
+  terms           Json      // Flexible term configuration
+  status          TradingTermStatus
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  products        TradingTermProduct[]
+  accruals        TradingTermAccrual[]
+  
+  @@index([companyId])
+  @@index([storeId])
+  @@index([startDate, endDate])
+}
+
+enum TradingTermType {
+  VOLUME_DISCOUNT
+  PAYMENT_TERMS
+  REBATE
+  ALLOWANCE
+  LISTING_FEE
+  SLOTTING_FEE
+  PROMOTIONAL_ALLOWANCE
+}
+
+enum TradingTermStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+model TradingTermProduct {
+  id            String      @id @default(uuid())
+  tradingTermId String
+  tradingTerm   TradingTerm @relation(fields: [tradingTermId], references: [id])
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  terms         Json        // Product-specific terms
+  createdAt     DateTime    @default(now())
+  
+  @@unique([tradingTermId, productId])
+  @@index([tradingTermId])
+  @@index([productId])
+}
+
+model TradingTermAccrual {
+  id            String      @id @default(uuid())
+  tradingTermId String
+  tradingTerm   TradingTerm @relation(fields: [tradingTermId], references: [id])
+  period        DateTime
+  amount        Float
+  status        String      // PENDING, APPROVED, PAID
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@index([tradingTermId])
+  @@index([period])
+}
+
+// ==================== CASH CO-OP & DIGITAL WALLETS ====================
+
+model CoopBudget {
+  id              String    @id @default(uuid())
+  name            String
+  budgetId        String
+  budget          Budget    @relation(fields: [budgetId], references: [id])
+  vendorId        String?
+  vendor          Vendor?   @relation(fields: [vendorId], references: [id])
+  criteria        Json      // Qualification criteria
+  totalAmount     Float
+  allocatedAmount Float     @default(0)
+  spentAmount     Float     @default(0)
+  startDate       DateTime
+  endDate         DateTime
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  status          CoopBudgetStatus
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  digitalWallets  DigitalWallet[]
+  
+  @@index([companyId])
+  @@index([budgetId])
+  @@index([vendorId])
+}
+
+enum CoopBudgetStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  DEPLETED
+}
+
+model DigitalWallet {
+  id              String    @id @default(uuid())
+  walletNumber    String    @unique
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  storeId         String?
+  store           Store?    @relation(fields: [storeId], references: [id])
+  coopBudgetId    String
+  coopBudget      CoopBudget @relation(fields: [coopBudgetId], references: [id])
+  balance         Float
+  creditLimit     Float
+  spentAmount     Float     @default(0)
+  status          WalletStatus
+  pin             String?   // Encrypted PIN
+  qrCode          String?   // QR code for redemption
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  transactions    WalletTransaction[]
+  
+  @@index([userId])
+  @@index([storeId])
+  @@index([coopBudgetId])
+  @@index([companyId])
+}
+
+enum WalletStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  LOCKED
+}
+
+model WalletTransaction {
+  id              String        @id @default(uuid())
+  transactionId   String        @unique
+  walletId        String
+  wallet          DigitalWallet @relation(fields: [walletId], references: [id])
+  type            TransactionType
+  amount          Float
+  balance         Float         // Balance after transaction
+  storeId         String?
+  store           Store?        @relation(fields: [storeId], references: [id])
+  description     String?
+  reasonCode      String?
+  receipt         String?       // Receipt image URL
+  latitude        Float?
+  longitude       Float?
+  approvedBy      String?
+  approvedAt      DateTime?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  
+  @@index([walletId])
+  @@index([storeId])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  REFUND
+  ADJUSTMENT
+}
+
+// ==================== TRADE SPEND ====================
+
+model TradeSpend {
+  id              String    @id @default(uuid())
+  promotionId     String?
+  promotion       Promotion? @relation(fields: [promotionId], references: [id])
+  storeId         String
+  store           Store     @relation(fields: [storeId], references: [id])
+  amount          Float
+  type            TradeSpendType
+  status          TradeSpendStatus
+  date            DateTime
+  invoiceNumber   String?
+  paymentDate     DateTime?
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([promotionId])
+  @@index([storeId])
+  @@index([companyId])
+  @@index([date])
+}
+
+enum TradeSpendType {
+  REBATE
+  DISCOUNT
+  LISTING_FEE
+  DISPLAY_FEE
+  PROMOTIONAL_ALLOWANCE
+  VOLUME_INCENTIVE
+  SLOTTING_FEE
+  OTHER
+}
+
+enum TradeSpendStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+  CANCELLED
+}
+
+// ==================== ANALYTICS & AI ====================
+
+model Analytics {
+  id                  String    @id @default(uuid())
+  date                DateTime
+  storeId             String?
+  store               Store?    @relation(fields: [storeId], references: [id])
+  revenue             Float
+  volume              Float
+  tradeSpend          Float
+  grossProfit         Float
+  netProfit           Float
+  roi                 Float
+  marketShare         Float?
+  customerCount       Int?
+  basketSize          Float?
+  incrementalRevenue  Float?
+  liftFactor          Float?
+  companyId           String
+  company             Company   @relation(fields: [companyId], references: [id])
+  metadata            Json?
+  createdAt           DateTime  @default(now())
+  
+  @@index([companyId])
+  @@index([storeId])
+  @@index([date])
+}
+
+model AIInsight {
+  id              String    @id @default(uuid())
+  type            InsightType
+  category        String?
+  title           String
+  description     String
+  impact          ImpactLevel
+  confidence      Float
+  recommendations Json[]
+  metadata        Json?
+  validFrom       DateTime
+  validTo         DateTime?
+  actionTaken     Boolean   @default(false)
+  actionDetails   Json?
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([companyId])
+  @@index([type])
+  @@index([validFrom, validTo])
+}
+
+enum InsightType {
+  OPTIMIZATION
+  ANOMALY
+  PREDICTION
+  RECOMMENDATION
+  ALERT
+  OPPORTUNITY
+}
+
+enum ImpactLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Simulation {
+  id              String    @id @default(uuid())
+  name            String
+  type            SimulationType
+  scenario        Json      // Scenario parameters
+  inputs          Json      // Input data
+  outputs         Json      // Simulation results
+  confidence      Float?
+  createdBy       String
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  createdAt       DateTime  @default(now())
+  
+  @@index([companyId])
+  @@index([createdBy])
+}
+
+enum SimulationType {
+  PROMOTION_IMPACT
+  PRICE_OPTIMIZATION
+  BUDGET_ALLOCATION
+  MARKET_SCENARIO
+  COMPETITIVE_RESPONSE
+}
+
+// ==================== CHAT & AI ASSISTANT ====================
+
+model ChatSession {
+  id          String    @id @default(uuid())
+  sessionId   String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  context     Json?     // Session context
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  messages    ChatMessage[]
+  
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model ChatMessage {
+  id          String      @id @default(uuid())
+  sessionId   String
+  session     ChatSession @relation(fields: [sessionId], references: [id])
+  role        MessageRole
+  content     String
+  metadata    Json?       // Additional message data
+  createdAt   DateTime    @default(now())
+  
+  @@index([sessionId])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ==================== WORKFLOWS & APPROVALS ====================
+
+model Workflow {
+  id              String    @id @default(uuid())
+  name            String
+  type            WorkflowType
+  description     String?
+  steps           Json      // Workflow steps configuration
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  approvals       Approval[]
+  
+  @@index([companyId])
+  @@index([type])
+}
+
+enum WorkflowType {
+  PROMOTION_APPROVAL
+  BUDGET_APPROVAL
+  CAMPAIGN_APPROVAL
+  TRADING_TERM_APPROVAL
+  SPEND_APPROVAL
+}
+
+model Approval {
+  id              String    @id @default(uuid())
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id])
+  entityType      String    // PROMOTION, BUDGET, etc.
+  entityId        String    // ID of the entity
+  step            Int
+  approverId      String
+  approver        User      @relation(fields: [approverId], references: [id])
+  status          ApprovalStatus
+  comments        String?
+  approvedAt      DateTime?
+  delegatedTo     String?
+  delegatedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([workflowId])
+  @@index([entityType, entityId])
+  @@index([approverId])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELEGATED
+  EXPIRED
+}
+
+model Delegation {
+  id              String    @id @default(uuid())
+  fromUserId      String
+  fromUser        User      @relation(fields: [fromUserId], references: [id])
+  toUserId        String
+  startDate       DateTime
+  endDate         DateTime
+  scope           Json?     // What can be delegated
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+// ==================== REPORTING & EXPORTS ====================
+
+model Report {
+  id              String    @id @default(uuid())
+  name            String
+  type            ReportType
+  description     String?
+  query           Json?     // Report query/configuration
+  schedule        Json?     // Scheduling configuration
+  recipients      String[]  // Email addresses
+  format          String    // PDF, EXCEL, CSV
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  createdBy       String
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([companyId])
+  @@index([type])
+}
+
+enum ReportType {
+  EXECUTIVE_SUMMARY
+  TRADE_SPEND_ANALYSIS
+  PROMOTION_PERFORMANCE
+  ROI_ANALYSIS
+  FORECAST_ACCURACY
+  BUDGET_UTILIZATION
+  CUSTOM
+}
+
+// ==================== INTEGRATION & SYNC ====================
+
+model Integration {
+  id              String    @id @default(uuid())
+  name            String
+  type            IntegrationType
+  config          Json      // Encrypted configuration
+  status          IntegrationStatus
+  lastSyncAt      DateTime?
+  nextSyncAt      DateTime?
+  syncErrors      Int       @default(0)
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  syncLogs        SyncLog[]
+  
+  @@index([companyId])
+  @@index([type])
+}
+
+enum IntegrationType {
+  SAP_ECC
+  SAP_S4HANA
+  EXCEL
+  API
+  WEBHOOK
+  SFTP
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+  DISABLED
+}
+
+model SyncLog {
+  id              String      @id @default(uuid())
+  integrationId   String
+  integration     Integration @relation(fields: [integrationId], references: [id])
+  direction       SyncDirection
+  entityType      String
+  recordsProcessed Int
+  recordsSuccess  Int
+  recordsFailed   Int
+  errors          Json?
+  duration        Int         // Duration in seconds
+  createdAt       DateTime    @default(now())
+  
+  @@index([integrationId])
+  @@index([createdAt])
+}
+
+enum SyncDirection {
+  IMPORT
+  EXPORT
+  BIDIRECTIONAL
+}
+
+// ==================== AUDIT & COMPLIANCE ====================
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  action      String
+  entityType  String
+  entityId    String
+  changes     Json?     // Before/after values
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model UserActivity {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  activity    String
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  type        NotificationType
+  title       String
+  message     String
+  data        Json?
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  PROMOTION_ALERT
+  SPEND_ALERT
+  PERFORMANCE_REPORT
+  SYSTEM_ALERT
+  APPROVAL_REQUEST
+  BUDGET_WARNING
+  FORECAST_UPDATE
+}
+
+model NotificationPreference {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id])
+  email               Boolean   @default(true)
+  push                Boolean   @default(true)
+  sms                 Boolean   @default(false)
+  promotionAlerts     Boolean   @default(true)
+  spendAlerts         Boolean   @default(true)
+  performanceReports  Boolean   @default(true)
+  systemAlerts        Boolean   @default(true)
+  approvalRequests    Boolean   @default(true)
+  budgetWarnings      Boolean   @default(true)
+  forecastUpdates     Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
