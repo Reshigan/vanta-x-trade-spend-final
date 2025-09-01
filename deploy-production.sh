@@ -331,6 +331,18 @@ clone_repository() {
         cd vanta-x-trade-spend-final
     fi
     
+    # Setup project structure if needed
+    if [[ ! -d "backend/api-gateway" ]]; then
+        print_message $YELLOW "Setting up project structure..."
+        if [[ -f "setup-project-structure.sh" ]]; then
+            chmod +x setup-project-structure.sh
+            ./setup-project-structure.sh
+        else
+            print_message $RED "Error: Project structure setup script not found"
+            exit 1
+        fi
+    fi
+    
     print_message $GREEN "✓ Repository ready"
 }
 
