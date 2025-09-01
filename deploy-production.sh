@@ -331,19 +331,301 @@ clone_repository() {
         cd vanta-x-trade-spend-final
     fi
     
-    # Setup project structure if needed
-    if [[ ! -d "backend/api-gateway" ]]; then
-        print_message $YELLOW "Setting up project structure..."
-        if [[ -f "setup-project-structure.sh" ]]; then
-            chmod +x setup-project-structure.sh
-            ./setup-project-structure.sh
-        else
-            print_message $RED "Error: Project structure setup script not found"
-            exit 1
-        fi
-    fi
-    
     print_message $GREEN "✓ Repository ready"
+}
+
+create_project_structure() {
+    log_step "Creating Project Structure"
+    
+    cd "$INSTALL_DIR/vanta-x-trade-spend-final"
+    
+    # Create backend services
+    services=(
+        "api-gateway:4000"
+        "identity-service:4001"
+        "operations-service:4002"
+        "analytics-service:4003"
+        "ai-service:4004"
+        "integration-service:4005"
+        "coop-service:4006"
+        "notification-service:4007"
+        "reporting-service:4008"
+        "workflow-service:4009"
+        "audit-service:4010"
+    )
+    
+    for service_info in "${services[@]}"; do
+        IFS=':' read -r service_name service_port <<< "$service_info"
+        
+        print_message "Creating $service_name..." $YELLOW
+        
+        mkdir -p "backend/$service_name/src"
+        
+        # Create minimal package.json
+        cat > "backend/$service_name/package.json" << EOF
+{
+  "name": "@vantax/$service_name",
+  "version": "1.0.0",
+  "description": "Vanta X $service_name",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "nodemon --exec ts-node src/main.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "@types/express": "^4.17.21",
+    "typescript": "^5.3.3",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2"
+  }
+}
+EOF
+
+        # Create tsconfig.json
+        cat > "backend/$service_name/tsconfig.json" << EOF
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+EOF
+
+        # Create Dockerfile
+        cat > "backend/$service_name/Dockerfile" << EOF
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+COPY tsconfig.json ./
+RUN npm ci
+COPY src ./src
+RUN npm run build
+
+FROM node:18-alpine
+WORKDIR /app
+RUN apk add --no-cache dumb-init
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+COPY --from=builder /app/dist ./dist
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+USER nodejs
+EXPOSE $service_port
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \\
+  CMD node -e "require('http').get('http://localhost:$service_port/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/main.js"]
+EOF
+
+        # Create main.ts
+        cat > "backend/$service_name/src/main.ts" << EOF
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const app = express();
+const port = process.env.PORT || $service_port;
+
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: '$service_name',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+app.get('/metrics', (req, res) => {
+  res.json({
+    memory: process.memoryUsage(),
+    uptime: process.uptime()
+  });
+});
+
+app.listen(port, () => {
+  console.log(\`$service_name listening on port \${port}\`);
+});
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+EOF
+
+        print_message "✓ Created $service_name" $GREEN
+    done
+    
+    # Create frontend structure
+    print_message "Creating frontend..." $YELLOW
+    mkdir -p "frontend/web-app/src"
+    mkdir -p "frontend/web-app/public"
+    
+    cat > "frontend/web-app/package.json" << EOF
+{
+  "name": "@vantax/web-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mui/material": "^5.15.0",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8"
+  }
+}
+EOF
+
+    cat > "frontend/web-app/vite.config.ts" << EOF
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    host: true
+  }
+});
+EOF
+
+    cat > "frontend/web-app/tsconfig.json" << EOF
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true
+  },
+  "include": ["src"]
+}
+EOF
+
+    cat > "frontend/web-app/Dockerfile" << EOF
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+EOF
+
+    cat > "frontend/web-app/public/index.html" << EOF
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vanta X - Trade Spend Management</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+EOF
+
+    cat > "frontend/web-app/src/main.tsx" << EOF
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import App from './App';
+
+const theme = createTheme({
+  palette: {
+    primary: { main: '#1976d2' },
+    secondary: { main: '#dc004e' }
+  }
+});
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <App />
+    </ThemeProvider>
+  </React.StrictMode>
+);
+EOF
+
+    cat > "frontend/web-app/src/App.tsx" << EOF
+import React from 'react';
+import { Container, Typography, Box } from '@mui/material';
+
+function App() {
+  return (
+    <Container maxWidth="lg">
+      <Box sx={{ my: 4, textAlign: 'center' }}>
+        <Typography variant="h2" component="h1" gutterBottom>
+          Vanta X
+        </Typography>
+        <Typography variant="h5" component="h2" gutterBottom>
+          FMCG Trade Marketing Management Platform
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Welcome to your comprehensive trade marketing solution
+        </Typography>
+      </Box>
+    </Container>
+  );
+}
+
+export default App;
+EOF
+
+    print_message "✓ Created frontend" $GREEN
+    
+    # Create scripts directory
+    mkdir -p scripts
+    
+    print_message $GREEN "✓ Project structure created"
 }
 
 create_environment_configuration() {
@@ -1112,13 +1394,13 @@ deploy_services() {
     
     # Create production override
     cat > docker-compose.override.yml << EOF
-version: '3.8'
-
 services:
   postgres:
     volumes:
       - $DATA_DIR/postgres:/var/lib/postgresql/data
     environment:
+      POSTGRES_DB: vantax
+      POSTGRES_USER: vantax_user
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     restart: always
     logging:
@@ -1140,6 +1422,9 @@ services:
   rabbitmq:
     volumes:
       - $DATA_DIR/rabbitmq:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: vantax
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     restart: always
     logging:
       driver: "json-file"
@@ -2302,6 +2587,7 @@ main() {
     
     # Application setup
     clone_repository
+    create_project_structure
     create_environment_configuration
     create_master_data_script
     
