@@ -1,0 +1,732 @@
+openapi: 3.0.0
+info:
+  title: Vanta X - Trade Spend Management API
+  description: |
+    Enterprise Trade Marketing Platform API
+    
+    ## Authentication
+    All API requests require authentication using JWT tokens obtained through the Microsoft 365 SSO flow.
+    
+    ## Rate Limiting
+    API requests are limited to 100 requests per minute per user.
+  version: 1.0.0
+  contact:
+    name: Vanta X Support
+    email: support@vantax.com
+    url: https://docs.vantax.com
+
+servers:
+  - url: https://api.vantax.com/v1
+    description: Production server
+  - url: https://staging-api.vantax.com/v1
+    description: Staging server
+  - url: http://localhost:4000/v1
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate user
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        200:
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/microsoft:
+    get:
+      summary: Initiate Microsoft 365 SSO
+      tags: [Authentication]
+      security: []
+      responses:
+        302:
+          description: Redirect to Microsoft login
+
+  /promotions:
+    get:
+      summary: List promotions
+      tags: [Promotions]
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PENDING_APPROVAL, APPROVED, ACTIVE, COMPLETED, CANCELLED]
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: List of promotions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromotionList'
+    
+    post:
+      summary: Create promotion
+      tags: [Promotions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromotionCreate'
+      responses:
+        201:
+          description: Promotion created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promotion'
+
+  /promotions/{id}:
+    get:
+      summary: Get promotion details
+      tags: [Promotions]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        200:
+          description: Promotion details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promotion'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /ai/optimize/trade-spend:
+    post:
+      summary: Optimize trade spend using AI
+      tags: [AI/ML]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeSpendOptimizationRequest'
+      responses:
+        200:
+          description: Optimization results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeSpendOptimizationResponse'
+
+  /ai/anomaly/detect:
+    post:
+      summary: Detect anomalies in data
+      tags: [AI/ML]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnomalyDetectionRequest'
+      responses:
+        200:
+          description: Anomaly detection results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnomalyDetectionResponse'
+
+  /ai/predict:
+    post:
+      summary: Generate predictions
+      tags: [AI/ML]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictionRequest'
+      responses:
+        200:
+          description: Prediction results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionResponse'
+
+  /chatbot/sessions/start:
+    post:
+      summary: Start chatbot session
+      tags: [Chatbot]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatSessionStart'
+      responses:
+        200:
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionResponse'
+
+  /chatbot/message:
+    post:
+      summary: Send message to chatbot
+      tags: [Chatbot]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessage'
+      responses:
+        200:
+          description: Chatbot response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+
+  /integration/sap/connect:
+    post:
+      summary: Connect to SAP system
+      tags: [Integration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SAPConnection'
+      responses:
+        200:
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationStatus'
+
+  /integration/excel/import:
+    post:
+      summary: Import data from Excel
+      tags: [Integration]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                type:
+                  type: string
+                  enum: [trade_spend, stores, products, promotions]
+      responses:
+        200:
+          description: Import successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+
+  /integration/excel/template/{type}:
+    get:
+      summary: Download Excel template
+      tags: [Integration]
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [trade_spend, stores, products, promotions]
+      responses:
+        200:
+          description: Excel template
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        statusCode:
+          type: integer
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+        company:
+          $ref: '#/components/schemas/Company'
+
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+        licenseCount:
+          type: integer
+        licenseType:
+          type: string
+          enum: [TRIAL, STANDARD, PROFESSIONAL, ENTERPRISE]
+
+    Promotion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [PRICE_REDUCTION, BOGO, BUNDLE, LOYALTY, SEASONAL, CLEARANCE, NEW_PRODUCT, CROSS_SELL]
+        status:
+          type: string
+          enum: [DRAFT, PENDING_APPROVAL, APPROVED, ACTIVE, COMPLETED, CANCELLED]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        discountType:
+          type: string
+          enum: [PERCENTAGE, FIXED_AMOUNT, TIERED, VOLUME]
+        discountValue:
+          type: number
+        budget:
+          type: number
+        actualSpend:
+          type: number
+        targetRevenue:
+          type: number
+        actualRevenue:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PromotionCreate:
+      type: object
+      required: [name, type, startDate, endDate, discountType, discountValue, budget]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [PRICE_REDUCTION, BOGO, BUNDLE, LOYALTY, SEASONAL, CLEARANCE, NEW_PRODUCT, CROSS_SELL]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        discountType:
+          type: string
+          enum: [PERCENTAGE, FIXED_AMOUNT, TIERED, VOLUME]
+        discountValue:
+          type: number
+        budget:
+          type: number
+        targetRevenue:
+          type: number
+        categoryId:
+          type: string
+          format: uuid
+        storeIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        productIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    PromotionList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Promotion'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    TradeSpendOptimizationRequest:
+      type: object
+      required: [category, storeType, discountType, discountValue, duration]
+      properties:
+        category:
+          type: string
+        storeType:
+          type: string
+        discountType:
+          type: string
+        discountValue:
+          type: number
+        duration:
+          type: integer
+        seasonality:
+          type: number
+
+    TradeSpendOptimizationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        optimization:
+          type: object
+          properties:
+            recommendedSpend:
+              type: number
+            expectedROI:
+              type: number
+            riskScore:
+              type: number
+            confidenceLevel:
+              type: number
+            recommendations:
+              type: array
+              items:
+                type: string
+
+    AnomalyDetectionRequest:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              storeId:
+                type: string
+              productId:
+                type: string
+              metric:
+                type: string
+              value:
+                type: number
+              expectedValue:
+                type: number
+
+    AnomalyDetectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        anomalies:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              isAnomaly:
+                type: boolean
+              anomalyScore:
+                type: number
+              severity:
+                type: string
+                enum: [LOW, MEDIUM, HIGH, CRITICAL]
+
+    PredictionRequest:
+      type: object
+      properties:
+        historicalData:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              value:
+                type: number
+        steps:
+          type: integer
+        options:
+          type: object
+          properties:
+            includeConfidenceInterval:
+              type: boolean
+            model:
+              type: string
+              enum: [lstm, arima, ensemble]
+
+    PredictionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        predictions:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              predictedValue:
+                type: number
+              confidenceInterval:
+                type: object
+                properties:
+                  lower:
+                    type: number
+                  upper:
+                    type: number
+
+    ChatSessionStart:
+      type: object
+      properties:
+        userId:
+          type: string
+        companyId:
+          type: string
+        userData:
+          type: object
+          properties:
+            name:
+              type: string
+            role:
+              type: string
+            department:
+              type: string
+
+    ChatSessionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sessionId:
+          type: string
+        response:
+          type: object
+          properties:
+            message:
+              type: string
+            suggestions:
+              type: array
+              items:
+                type: string
+
+    ChatMessage:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        message:
+          type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        response:
+          type: object
+          properties:
+            message:
+              type: string
+            data:
+              type: object
+            actions:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  label:
+                    type: string
+                  action:
+                    type: string
+
+    SAPConnection:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [ECC, S4HANA]
+        host:
+          type: string
+        client:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+
+    IntegrationStatus:
+      type: object
+      properties:
+        success:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, ERROR, SYNCING]
+        message:
+          type: string
+        lastSyncAt:
+          type: string
+          format: date-time
+
+    ImportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        recordsProcessed:
+          type: integer
+        recordsImported:
+          type: integer
+        recordsFailed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row:
+                type: integer
+              field:
+                type: string
+              error:
+                type: string

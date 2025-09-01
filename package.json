@@ -1,0 +1,95 @@
+{
+  "name": "vanta-x-trade-spend",
+  "version": "1.0.0",
+  "description": "Enterprise Trade Spend Management Platform",
+  "private": true,
+  "workspaces": [
+    "backend/*",
+    "frontend/*"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:web-app": "cd frontend/web-app && npm run dev",
+    "dev:admin-portal": "cd frontend/admin-portal && npm run dev",
+    "dev:api-gateway": "cd backend/api-gateway && npm run dev",
+    "dev:ai-service": "cd backend/ai-service && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:e2e": "playwright test",
+    "test:performance": "k6 run tests/performance/load-test.js",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "migrate": "cd backend && npm run migrate",
+    "migrate:dev": "cd backend && npm run migrate:dev",
+    "seed": "cd backend && npm run seed",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "k8s:deploy": "kubectl apply -f infrastructure/kubernetes/",
+    "k8s:delete": "kubectl delete -f infrastructure/kubernetes/",
+    "backup": "npm run backup:db && npm run backup:files",
+    "backup:db": "scripts/backup/backup-database.sh",
+    "backup:files": "scripts/backup/backup-files.sh",
+    "monitor:start": "cd scripts/monitoring && docker-compose up -d",
+    "monitor:stop": "cd scripts/monitoring && docker-compose down",
+    "docs:api": "cd docs/api && npm run generate",
+    "docs:serve": "cd docs && npm run serve",
+    "release": "standard-version",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "concurrently": "^8.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "husky": "^8.0.0",
+    "jest": "^29.0.0",
+    "lint-staged": "^14.0.0",
+    "prettier": "^3.0.0",
+    "standard-version": "^9.5.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/vanta-x-trade-spend.git"
+  },
+  "keywords": [
+    "trade-spend",
+    "trade-marketing",
+    "retail",
+    "ai",
+    "analytics",
+    "enterprise"
+  ],
+  "author": "Vanta X Team",
+  "license": "MIT"
+}

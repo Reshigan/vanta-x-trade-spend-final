@@ -1,0 +1,609 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== IDENTITY & ACCESS ====================
+
+model User {
+  id                String            @id @default(uuid())
+  email             String            @unique
+  firstName         String
+  lastName          String
+  azureAdId         String?           @unique
+  role              UserRole
+  department        String?
+  isActive          Boolean           @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  company           Company           @relation(fields: [companyId], references: [id])
+  companyId         String
+  sessions          Session[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  chatSessions      ChatSession[]
+  promotionsCreated Promotion[]       @relation("CreatedBy")
+  promotionsUpdated Promotion[]       @relation("UpdatedBy")
+  
+  @@index([email])
+  @@index([companyId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  token        String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  @@index([token])
+  @@index([userId])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  CEO
+  TRADE_MARKETING_DIRECTOR
+  TRADE_MARKETING_MANAGER
+  CATEGORY_MANAGER
+  SALES_DIRECTOR
+  FINANCE_MANAGER
+  DATA_ANALYST
+  PROMOTION_COORDINATOR
+  STORE_OPERATIONS_MANAGER
+  BUSINESS_INTELLIGENCE_ANALYST
+  VIEWER
+}
+
+// ==================== COMPANY MANAGEMENT ====================
+
+model Company {
+  id              String          @id @default(uuid())
+  name            String          @unique
+  code            String          @unique
+  industry        String
+  country         String
+  currency        String          @default("USD")
+  fiscalYearStart Int             @default(1) // Month (1-12)
+  licenseCount    Int             @default(10)
+  licenseType     LicenseType     @default(STANDARD)
+  isActive        Boolean         @default(true)
+  settings        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  users           User[]
+  stores          Store[]
+  products        Product[]
+  categories      Category[]
+  promotions      Promotion[]
+  tradeSpends     TradeSpend[]
+  analytics       Analytics[]
+  integrations    Integration[]
+  
+  @@index([code])
+}
+
+enum LicenseType {
+  TRIAL
+  STANDARD
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// ==================== MASTER DATA ====================
+
+model Store {
+  id           String        @id @default(uuid())
+  code         String
+  name         String
+  type         StoreType
+  region       String
+  district     String?
+  address      String?
+  city         String
+  state        String?
+  postalCode   String?
+  country      String
+  latitude     Float?
+  longitude    Float?
+  size         StoreSize
+  isActive     Boolean       @default(true)
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  company      Company       @relation(fields: [companyId], references: [id])
+  companyId    String
+  promotions   PromotionStore[]
+  analytics    Analytics[]
+  
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([type])
+  @@index([region])
+}
+
+enum StoreType {
+  HYPERMARKET
+  SUPERMARKET
+  CONVENIENCE
+  WHOLESALE
+  ONLINE
+  SPECIALTY
+  DEPARTMENT
+  PHARMACY
+}
+
+enum StoreSize {
+  SMALL
+  MEDIUM
+  LARGE
+  EXTRA_LARGE
+}
+
+model Product {
+  id              String          @id @default(uuid())
+  sku             String
+  name            String
+  description     String?
+  brand           String
+  manufacturer    String?
+  barcode         String?
+  unitPrice       Decimal         @db.Decimal(10, 2)
+  unitCost        Decimal         @db.Decimal(10, 2)
+  packSize        Int             @default(1)
+  weight          Float?
+  volume          Float?
+  isActive        Boolean         @default(true)
+  launchDate      DateTime?
+  discontinueDate DateTime?
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  company         Company         @relation(fields: [companyId], references: [id])
+  companyId       String
+  category        Category        @relation(fields: [categoryId], references: [id])
+  categoryId      String
+  promotions      PromotionProduct[]
+  analytics       Analytics[]
+  
+  @@unique([companyId, sku])
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([brand])
+}
+
+model Category {
+  id          String      @id @default(uuid())
+  code        String
+  name        String
+  parentId    String?
+  parent      Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[]  @relation("CategoryHierarchy")
+  level       Int         @default(1)
+  isActive    Boolean     @default(true)
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  company     Company     @relation(fields: [companyId], references: [id])
+  companyId   String
+  products    Product[]
+  promotions  Promotion[]
+  
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([parentId])
+}
+
+// ==================== TRADE MARKETING ====================
+
+model Promotion {
+  id                String              @id @default(uuid())
+  code              String
+  name              String
+  description       String?
+  type              PromotionType
+  status            PromotionStatus     @default(DRAFT)
+  startDate         DateTime
+  endDate           DateTime
+  discountType      DiscountType
+  discountValue     Decimal             @db.Decimal(10, 2)
+  minPurchaseQty    Int?
+  maxDiscountAmount Decimal?            @db.Decimal(10, 2)
+  budget            Decimal             @db.Decimal(12, 2)
+  actualSpend       Decimal             @default(0) @db.Decimal(12, 2)
+  targetRevenue     Decimal?            @db.Decimal(12, 2)
+  actualRevenue     Decimal             @default(0) @db.Decimal(12, 2)
+  targetUnits       Int?
+  actualUnits       Int                 @default(0)
+  terms             String?
+  metadata          Json?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  company           Company             @relation(fields: [companyId], references: [id])
+  companyId         String
+  category          Category?           @relation(fields: [categoryId], references: [id])
+  categoryId        String?
+  createdBy         User                @relation("CreatedBy", fields: [createdById], references: [id])
+  createdById       String
+  updatedBy         User                @relation("UpdatedBy", fields: [updatedById], references: [id])
+  updatedById       String
+  stores            PromotionStore[]
+  products          PromotionProduct[]
+  tradeSpends       TradeSpend[]
+  analytics         Analytics[]
+  
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+enum PromotionType {
+  PRICE_REDUCTION
+  BOGO
+  BUNDLE
+  LOYALTY
+  SEASONAL
+  CLEARANCE
+  NEW_PRODUCT
+  CROSS_SELL
+}
+
+enum PromotionStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  TIERED
+  VOLUME
+}
+
+model PromotionStore {
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  promotionId String
+  store       Store     @relation(fields: [storeId], references: [id])
+  storeId     String
+  isActive    Boolean   @default(true)
+  
+  @@id([promotionId, storeId])
+  @@index([storeId])
+}
+
+model PromotionProduct {
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  promotionId String
+  product     Product   @relation(fields: [productId], references: [id])
+  productId   String
+  isActive    Boolean   @default(true)
+  
+  @@id([promotionId, productId])
+  @@index([productId])
+}
+
+model TradeSpend {
+  id              String          @id @default(uuid())
+  type            TradeSpendType
+  amount          Decimal         @db.Decimal(12, 2)
+  currency        String          @default("USD")
+  status          TradeSpendStatus @default(PLANNED)
+  invoiceNumber   String?
+  invoiceDate     DateTime?
+  paymentDate     DateTime?
+  paymentMethod   String?
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  company         Company         @relation(fields: [companyId], references: [id])
+  companyId       String
+  promotion       Promotion       @relation(fields: [promotionId], references: [id])
+  promotionId     String
+  
+  @@index([companyId])
+  @@index([promotionId])
+  @@index([status])
+}
+
+enum TradeSpendType {
+  SLOTTING_FEE
+  LISTING_FEE
+  PROMOTIONAL_ALLOWANCE
+  VOLUME_DISCOUNT
+  COOP_ADVERTISING
+  DISPLAY_FEE
+  REBATE
+  OTHER
+}
+
+enum TradeSpendStatus {
+  PLANNED
+  COMMITTED
+  INVOICED
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+// ==================== ANALYTICS ====================
+
+model Analytics {
+  id            String        @id @default(uuid())
+  date          DateTime
+  metric        MetricType
+  value         Decimal       @db.Decimal(15, 2)
+  quantity      Int?
+  metadata      Json?
+  createdAt     DateTime      @default(now())
+
+  // Relations
+  company       Company       @relation(fields: [companyId], references: [id])
+  companyId     String
+  store         Store?        @relation(fields: [storeId], references: [id])
+  storeId       String?
+  product       Product?      @relation(fields: [productId], references: [id])
+  productId     String?
+  promotion     Promotion?    @relation(fields: [promotionId], references: [id])
+  promotionId   String?
+  
+  @@index([companyId, date])
+  @@index([storeId])
+  @@index([productId])
+  @@index([promotionId])
+  @@index([metric])
+}
+
+enum MetricType {
+  REVENUE
+  UNITS_SOLD
+  MARGIN
+  TRAFFIC
+  CONVERSION_RATE
+  BASKET_SIZE
+  PROMOTION_LIFT
+  ROI
+  COST
+}
+
+// ==================== AI/ML ====================
+
+model MLModel {
+  id              String          @id @default(uuid())
+  name            String
+  type            ModelType
+  version         String
+  status          ModelStatus     @default(TRAINING)
+  accuracy        Float?
+  parameters      Json
+  trainingData    Json?
+  validationData  Json?
+  metadata        Json?
+  trainedAt       DateTime?
+  deployedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  @@unique([name, version])
+  @@index([type])
+  @@index([status])
+}
+
+enum ModelType {
+  TRADE_SPEND_OPTIMIZER
+  ANOMALY_DETECTOR
+  DEMAND_FORECASTER
+  PRICE_ELASTICITY
+  PROMOTION_RECOMMENDER
+}
+
+enum ModelStatus {
+  TRAINING
+  VALIDATING
+  DEPLOYED
+  ARCHIVED
+  FAILED
+}
+
+model ChatSession {
+  id              String          @id @default(uuid())
+  sessionId       String          @unique
+  context         Json?
+  metadata        Json?
+  startedAt       DateTime        @default(now())
+  endedAt         DateTime?
+  
+  // Relations
+  user            User            @relation(fields: [userId], references: [id])
+  userId          String
+  messages        ChatMessage[]
+  
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model ChatMessage {
+  id              String          @id @default(uuid())
+  role            MessageRole
+  content         String          @db.Text
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  
+  // Relations
+  session         ChatSession     @relation(fields: [sessionId], references: [id])
+  sessionId       String
+  
+  @@index([sessionId])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ==================== INTEGRATION ====================
+
+model Integration {
+  id              String              @id @default(uuid())
+  type            IntegrationType
+  name            String
+  status          IntegrationStatus   @default(INACTIVE)
+  config          Json                @db.Json
+  lastSyncAt      DateTime?
+  metadata        Json?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  company         Company             @relation(fields: [companyId], references: [id])
+  companyId       String
+  logs            IntegrationLog[]
+  
+  @@unique([companyId, type])
+  @@index([companyId])
+  @@index([type])
+}
+
+enum IntegrationType {
+  SAP_ECC
+  SAP_S4HANA
+  EXCEL
+  MICROSOFT_365
+  SALESFORCE
+  ORACLE
+  CUSTOM_API
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  SYNCING
+}
+
+model IntegrationLog {
+  id              String          @id @default(uuid())
+  action          String
+  status          LogStatus
+  message         String?
+  details         Json?
+  recordsAffected Int             @default(0)
+  startedAt       DateTime
+  completedAt     DateTime?
+  
+  // Relations
+  integration     Integration     @relation(fields: [integrationId], references: [id])
+  integrationId   String
+  
+  @@index([integrationId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum LogStatus {
+  SUCCESS
+  FAILED
+  WARNING
+  IN_PROGRESS
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id              String              @id @default(uuid())
+  type            NotificationType
+  title           String
+  message         String              @db.Text
+  priority        NotificationPriority @default(MEDIUM)
+  status          NotificationStatus   @default(UNREAD)
+  metadata        Json?
+  readAt          DateTime?
+  createdAt       DateTime            @default(now())
+  
+  // Relations
+  user            User                @relation(fields: [userId], references: [id])
+  userId          String
+  
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+}
+
+enum NotificationType {
+  PROMOTION_APPROVAL
+  PROMOTION_EXPIRY
+  BUDGET_ALERT
+  ANOMALY_DETECTED
+  SYSTEM_UPDATE
+  INTEGRATION_ERROR
+  REPORT_READY
+}
+
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+// ==================== AUDIT & COMPLIANCE ====================
+
+model AuditLog {
+  id              String          @id @default(uuid())
+  action          String
+  entity          String
+  entityId        String?
+  oldValues       Json?
+  newValues       Json?
+  ipAddress       String?
+  userAgent       String?
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  
+  // Relations
+  user            User            @relation(fields: [userId], references: [id])
+  userId          String
+  
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+}

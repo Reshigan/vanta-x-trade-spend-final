@@ -1,0 +1,39 @@
+{
+  "name": "@vanta-x/admin-portal",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.0",
+    "@mui/material": "^5.14.0",
+    "@mui/x-data-grid": "^6.18.0",
+    "@mui/x-date-pickers": "^6.18.0",
+    "@tanstack/react-query": "^5.0.0",
+    "axios": "^1.6.0",
+    "chart.js": "^4.4.0",
+    "date-fns": "^2.30.0",
+    "next": "14.0.0",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.47.0",
+    "recharts": "^2.9.0",
+    "zustand": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "14.0.0",
+    "typescript": "^5.0.0"
+  }
+}

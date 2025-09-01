@@ -1,0 +1,141 @@
+# Dependencies
+node_modules/
+bower_components/
+jspm_packages/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# TypeScript
+*.tsbuildinfo
+.tsc-cache/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Package files
+*.tgz
+*.tar.gz
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# SSL certificates (except examples)
+*.pem
+*.key
+*.crt
+*.csr
+!examples/**/*.pem
+!examples/**/*.key
+
+# Uploaded files
+uploads/
+public/uploads/
+
+# Generated files
+generated/
+.generated/
+
+# Lock files (keep package-lock.json)
+yarn.lock
+pnpm-lock.yaml
+
+# Monitoring
+.monitoring/
+
+# Cache
+.eslintcache
+.stylelintcache
+
+# Misc
+.history/
+.husky/_/
+.openhands/

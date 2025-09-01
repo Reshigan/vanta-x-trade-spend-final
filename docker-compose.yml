@@ -1,0 +1,306 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: vantax-postgres
+    environment:
+      POSTGRES_DB: vantax
+      POSTGRES_USER: vantax
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vantax2025}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - vantax-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vantax"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: vantax-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-vantax2025}
+    ports:
+      - "6379:6379"
+    networks:
+      - vantax-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Message Queue
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: vantax-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: vantax
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-vantax2025}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - vantax-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: vantax-api-gateway
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4000
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Identity Service
+  identity-service:
+    build:
+      context: ./backend/identity-service
+      dockerfile: Dockerfile
+    container_name: vantax-identity
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4001
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+      AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID}
+      AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
+      AZURE_AD_CLIENT_SECRET: ${AZURE_AD_CLIENT_SECRET}
+    ports:
+      - "4001:4001"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Company Service
+  company-service:
+    build:
+      context: ./backend/company-service
+      dockerfile: Dockerfile
+    container_name: vantax-company
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4002
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+    ports:
+      - "4002:4002"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Trade Marketing Service
+  trade-marketing-service:
+    build:
+      context: ./backend/trade-marketing-service
+      dockerfile: Dockerfile
+    container_name: vantax-trade-marketing
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4003
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+    ports:
+      - "4003:4003"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Analytics Service
+  analytics-service:
+    build:
+      context: ./backend/analytics-service
+      dockerfile: Dockerfile
+    container_name: vantax-analytics
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4004
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+    ports:
+      - "4004:4004"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: vantax-notification
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4005
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+      RABBITMQ_URL: amqp://vantax:${RABBITMQ_PASSWORD:-vantax2025}@rabbitmq:5672
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+    ports:
+      - "4005:4005"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Integration Service
+  integration-service:
+    build:
+      context: ./backend/integration-service
+      dockerfile: Dockerfile
+    container_name: vantax-integration
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4006
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+    ports:
+      - "4006:4006"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # AI Service
+  ai-service:
+    build:
+      context: ./backend/ai-service
+      dockerfile: Dockerfile
+    container_name: vantax-ai
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4007
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "4007:4007"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Admin Service
+  admin-service:
+    build:
+      context: ./backend/admin-service
+      dockerfile: Dockerfile
+    container_name: vantax-admin
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4008
+      DATABASE_URL: postgresql://vantax:${DB_PASSWORD:-vantax2025}@postgres:5432/vantax
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vantax2025}@redis:6379
+    ports:
+      - "4008:4008"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Web Application
+  web-app:
+    build:
+      context: ./frontend/web-app
+      dockerfile: Dockerfile
+    container_name: vantax-web
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: http://api-gateway:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Admin Portal
+  admin-portal:
+    build:
+      context: ./frontend/admin-portal
+      dockerfile: Dockerfile
+    container_name: vantax-admin-portal
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: http://api-gateway:4000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api-gateway
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: vantax-nginx
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web-app
+      - admin-portal
+      - api-gateway
+    networks:
+      - vantax-network
+    restart: unless-stopped
+
+networks:
+  vantax-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
